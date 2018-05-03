@@ -24,6 +24,8 @@ class openvpn::deploy::prepare {
   class { 'openvpn::params': }
 
   class { 'openvpn::deploy::install': }
-  ~> class { 'openvpn::deploy::service': }
+  ~> class { 'openvpn::deploy::service':
+  	host => "."
+	}
 
 }
