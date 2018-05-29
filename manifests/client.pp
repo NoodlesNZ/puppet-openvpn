@@ -150,6 +150,15 @@
 #            Use this in Combination with exported_ressourced, since they don't have Access to the Serverconfig
 #   Default: false
 #
+# [*ns_cert_type*]
+#   Boolean. Enable or disable use of ns-cert-type.
+#   Deprecated in OpenVPN 2.4 and replaced with remote-cert-tls
+#   Default: true
+#
+# [*remote_cert_tls*]
+#   Boolean. Enable or disable use of remote-cert-tls
+#   used with client configuration
+#   Default: false
 # === Examples
 #
 #   openvpn::client {
@@ -216,7 +225,9 @@ define openvpn::client (
   Optional[Integer] $expire                   = undef,
   Optional[String] $readme                    = undef,
   Boolean $pull                               = false,
-  Boolean $server_extca_enabled               = false
+  Boolean $server_extca_enabled               = false,
+  Boolean $ns_cert_type                       = true,
+  Boolean $remote_cert_tls                    = false,
 ) {
 
   if $pam {
@@ -245,11 +256,21 @@ define openvpn::client (
     $env_expire = ''
   }
 
-  exec { "generate certificate for ${name} in context of ${ca_name}":
-    command  => ". ./vars && ${env_expire} ./pkitool ${name}",
-    cwd      => "${etc_directory}/openvpn/${ca_name}/easy-rsa",
-    creates  => "${etc_directory}/openvpn/${ca_name}/easy-rsa/keys/${name}.crt",
-    provider => 'shell';
+  if $openvpn::params::easyrsa_ver == '2.0' {
+    exec { "generate certificate for ${name} in context of ${ca_name}":
+      command  => ". ./vars && ${env_expire} ./pkitool ${name}",
+      cwd      => "${etc_directory}/openvpn/${ca_name}/easy-rsa",
+      creates  => "${etc_directory}/openvpn/${ca_name}/easy-rsa/keys/${name}.crt",
+      provider => 'shell';
+    }
+  }
+  else {
+    exec { "generate certificate for ${name} in context of ${ca_name}":
+      command  => ". ./vars && ${env_expire} ./easyrsa --batch build-client-full ${name} nopass",
+      cwd      => "${etc_directory}/openvpn/${ca_name}/easy-rsa",
+      creates  => "${etc_directory}/openvpn/${ca_name}/easy-rsa/keys/issued/${name}.crt",
+      provider => 'shell';
+    }
   }
 
   file { [ "${etc_directory}/openvpn/${server}/download-configs/${name}",
@@ -258,16 +279,31 @@ define openvpn::client (
     ensure => directory,
   }
 
-  file { "${etc_directory}/openvpn/${server}/download-configs/${name}/keys/${name}/${name}.crt":
-    ensure  => link,
-    target  => "${etc_directory}/openvpn/${ca_name}/easy-rsa/keys/${name}.crt",
-    require => Exec["generate certificate for ${name} in context of ${ca_name}"],
-  }
+  if $openvpn::params::easyrsa_ver == '2.0' {
+    file { "${etc_directory}/openvpn/${server}/download-configs/${name}/keys/${name}/${name}.crt":
+      ensure  => link,
+      target  => "${etc_directory}/openvpn/${ca_name}/easy-rsa/keys/${name}.crt",
+      require => Exec["generate certificate for ${name} in context of ${ca_name}"],
+    }
 
-  file { "${etc_directory}/openvpn/${server}/download-configs/${name}/keys/${name}/${name}.key":
-    ensure  => link,
-    target  => "${etc_directory}/openvpn/${ca_name}/easy-rsa/keys/${name}.key",
-    require => Exec["generate certificate for ${name} in context of ${ca_name}"],
+    file { "${etc_directory}/openvpn/${server}/download-configs/${name}/keys/${name}/${name}.key":
+      ensure  => link,
+      target  => "${etc_directory}/openvpn/${ca_name}/easy-rsa/keys/${name}.key",
+      require => Exec["generate certificate for ${name} in context of ${ca_name}"],
+    }
+  }
+  else {
+    file { "${etc_directory}/openvpn/${server}/download-configs/${name}/keys/${name}/${name}.crt":
+      ensure  => link,
+      target  => "${etc_directory}/openvpn/${ca_name}/easy-rsa/keys/issued/${name}.crt",
+      require => Exec["generate certificate for ${name} in context of ${ca_name}"],
+    }
+
+    file { "${etc_directory}/openvpn/${server}/download-configs/${name}/keys/${name}/${name}.key":
+      ensure  => link,
+      target  => "${etc_directory}/openvpn/${ca_name}/easy-rsa/keys/private/${name}.key",
+      require => Exec["generate certificate for ${name} in context of ${ca_name}"],
+    }
   }
 
   file { "${etc_directory}/openvpn/${server}/download-configs/${name}/keys/${name}/ca.crt":

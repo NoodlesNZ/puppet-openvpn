@@ -5,6 +5,8 @@ client-config-dir <%= @etc_directory -%>/openvpn/<%= @name %>/client-configs
 client
 <% if @ns_cert_type -%>
 ns-cert-type server
+<% elsif @remote_cert_tls -%>
+remote-cert-tls server
 <% end -%>
 <% @remote.to_a.each do |rem| -%>
 remote <%= rem %>
@@ -24,11 +26,21 @@ dh <%= @extca_dh_file %>
 crl-verify <%= @extca_ca_crl_file %>
 <%   end -%>
 <% else -%>
+<%- if scope.lookupvar('::openvpn::params::easyrsa_ver') == '2.0' -%>
 ca <%= @etc_directory -%>/openvpn/<%= @ca_name %>/keys/ca.crt
 cert <%= @etc_directory -%>/openvpn/<%= @ca_name %>/keys/<%= @ca_common_name %>.crt
 key <%= @etc_directory -%>/openvpn/<%= @ca_name %>/keys/<%= @ca_common_name %>.key
+<%- else -%>
+ca <%= @etc_directory -%>/openvpn/<%= @ca_name %>/keys/ca.crt
+cert <%= @etc_directory -%>/openvpn/<%= @ca_name %>/keys/issued/<%= @ca_common_name %>.crt
+key <%= @etc_directory -%>/openvpn/<%= @ca_name %>/keys/private/<%= @ca_common_name %>.key
+<%- end -%>
 <%   unless @remote -%>
+<%- if scope.lookupvar('::openvpn::params::easyrsa_ver') == '2.0' -%>
 dh <%= @etc_directory -%>/openvpn/<%= @ca_name %>/keys/dh<%= @ssl_key_size %>.pem
+<%- else -%>
+dh <%= @etc_directory -%>/openvpn/<%= @ca_name %>/keys/dh.pem
+<%- end -%>
 <%   end -%>
 <%   unless @remote or !@crl_verify -%>
 crl-verify <%= @etc_directory -%>/openvpn/<%= @ca_name %>/crl.pem
@@ -108,7 +120,7 @@ verb <%= @verb %>
 <% if @cipher != '' -%>
 cipher <%= @cipher %>
 <% end -%>
-<% if @tls_cipher -%>
+<% if @tls_cipher != '' -%>
 tls-cipher <%= @tls_cipher %>
 <% end -%>
 <% if @c2c -%>
