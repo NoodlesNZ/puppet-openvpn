@@ -648,12 +648,12 @@ define openvpn::server (
 
       ## Renewal of crl.pem
       if ($crl_auto_renew) {
-        schedule { "renew crl.pem schedule on ${name}":
-          range  => '1 - 4',
-          period => $crl_renew_schedule_period,
-          repeat => $crl_renew_schedule_repeat,
-        }
         if $openvpn::params::easyrsa_ver == '2.0' {
+          schedule { "renew crl.pem schedule on ${name}":
+            range  => '1 - 4',
+            period => $crl_renew_schedule_period,
+            repeat => $crl_renew_schedule_repeat,
+          }
           exec { "renew crl.pem on ${name}":
             command  => ". ./vars && KEY_CN='' KEY_OU='' KEY_NAME='' KEY_ALTNAMES='' openssl ca -gencrl -out ${::openvpn::params::etc_directory}/openvpn/${name}/crl.pem -config ${::openvpn::params::etc_directory}/openvpn/${name}/easy-rsa/openssl.cnf",
             cwd      => "${::openvpn::params::etc_directory}/openvpn/${name}/easy-rsa",
@@ -661,6 +661,11 @@ define openvpn::server (
             schedule => "renew crl.pem schedule on ${name}",
           }
         } else {
+          schedule { "renew crl.pem schedule on ${name}":
+            range  => '1 - 4',
+            period => $crl_renew_schedule_period,
+            repeat => $crl_renew_schedule_repeat,
+          }
           exec { "renew crl.pem on ${name}":
             command  => ". ./vars && EASYRSA_REQ_CN='' EASYRSA_REQ_OU='' openssl ca -gencrl -out ${etc_directory}/openvpn/${name}/crl.pem -config ${etc_directory}/openvpn/${name}/easy-rsa/openssl.cnf",
             cwd      => "${::openvpn::params::etc_directory}/openvpn/${name}/easy-rsa",
