@@ -60,9 +60,17 @@ define openvpn::revoke (
   $etc_directory = $::openvpn::params::etc_directory
 
   exec { "revoke certificate for ${name} in context of ${server}":
-    command  => ". ./vars && ./revoke-full ${name}; echo \"exit $?\" | grep -qE '(error 23|exit (0|2))' && touch revoked/${name}",
+    command  => ". ./vars && ./easyrsa --batch revoke ${name}; echo \"exit $?\" | grep -qE '(error 23|exit (0|2))' && touch revoked/${name}",
     cwd      => "${etc_directory}/openvpn/${server}/easy-rsa",
     creates  => "${etc_directory}/openvpn/${server}/easy-rsa/revoked/${name}",
     provider => 'shell',
+    notify   => Exec["update crl.pem on ${server} after revoke"],
+  }
+
+  exec { "update crl.pem on ${server} after revoke":
+    command  => ". ./vars && EASYRSA_REQ_CN='' EASYRSA_REQ_OU='' openssl ca -gencrl -out ${etc_directory}/openvpn/${server}/crl.pem -config ${etc_directory}/openvpn/${server}/easy-rsa/openssl.cnf",
+    cwd      => "${etc_directory}/openvpn/${server}/easy-rsa",
+    provider => 'shell',
+    refreshonly => true,
   }
 }
